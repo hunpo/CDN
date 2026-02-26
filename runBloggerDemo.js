@@ -15,57 +15,62 @@ window.runBloggerDemo = function (btn) {
         <html>
         <head>
             <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <style>
-                /* 确保内容从左上角开始缩放 */
                 html, body { 
                     margin: 0; 
                     padding: 0; 
-                    font-family: sans-serif; 
-                    overflow-x: hidden; /* 防止横向滚动条 */
+                    font-family: sans-serif;
+                    /* 允许横向滚动以测量真实宽度，但我们要通过缩放解决它 */
                 }
-                body { padding: 10px; box-sizing: border-box; }
-                
-                /* 强制覆盖用户的固定大宽度，确保基础响应式 */
-                * { max-width: 100% !important; box-sizing: border-box !important; }
+                body { padding: 0; box-sizing: border-box; position: absolute; left: 0; top: 0; }
                 
                 ${css}
             </style>
         </head>
         <body>
-            <div id="demo-content-wrapper">
+            <div id="inner-canvas" style="display: inline-block; min-width: 1200px; transform-origin: 0 0;">
                 ${html}
             </div>
             <script>
-                // 通知父窗口高度
-                function sendHeight() {
-                    const height = document.documentElement.scrollHeight;
-                    window.parent.postMessage({ type: 'resize', height: height }, '*');
+                function adaptLayout() {
+                    const canvas = document.getElementById('inner-canvas');
+                    const iframeWidth = window.innerWidth;
+                    // 假设你的设计基准宽度是 1200px (即你想要完整看到的宽度)
+                    const baseWidth = 1200; 
+                    
+                    if (iframeWidth < baseWidth) {
+                        const scale = iframeWidth / baseWidth;
+                        canvas.style.transform = 'scale(' + scale + ')';
+                    } else {
+                        canvas.style.transform = 'none';
+                        canvas.style.width = '100%';
+                    }
+
+                    // 通知父窗体高度（缩放后的高度）
+                    const actualHeight = canvas.getBoundingClientRect().height;
+                    window.parent.postMessage({ type: 'resize', height: actualHeight + 20 }, '*');
                 }
-                window.onload = sendHeight;
-                // 如果有图片加载，重新计算高度
-                window.addEventListener('resize', sendHeight);
+
+                window.onload = adaptLayout;
+                window.onresize = adaptLayout;
                 ${js}
             <\/script>
         </body>
         </html>
     `;
 
-  // 1. 设置内容
   iframe.srcdoc = fullContent;
 
-  // 2. 监听来自 iframe 的高度调整请求
-  window.addEventListener(
-    'message',
-    function (e) {
-      if (e.data.type === 'resize') {
-        iframe.style.height = e.data.height + 'px';
-      }
-    },
-    false,
-  );
+  // 监听高度调整
+  const messageHandler = function (e) {
+    if (e.data.type === 'resize') {
+      iframe.style.height = e.data.height + 'px';
+    }
+  };
+  // 防止重复绑定监听器
+  window.removeEventListener('message', messageHandler);
+  window.addEventListener('message', messageHandler, false);
 
-  // 3. UI 切换
   previewArea.style.display = 'block';
   btn.textContent = '刷新预览';
 };
