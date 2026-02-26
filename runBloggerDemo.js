@@ -2,9 +2,7 @@ window.runBloggerDemo = function (btn) {
   const wrapper = btn.closest('.custom-demo-wrapper');
   if (!wrapper) return;
 
-  // 获取数据并清理 HTML 里的错误引用
   let html = wrapper.querySelector('.raw-html').textContent;
-  // 自动删除代码中可能残留的本地 CSS 引用，防止报错
   html = html.replace(/<link.*?>/gi, '');
 
   const css = wrapper.querySelector('.raw-css').textContent;
@@ -12,7 +10,6 @@ window.runBloggerDemo = function (btn) {
   const previewArea = wrapper.querySelector('.preview-area');
   const iframe = wrapper.querySelector('.demo-frame');
 
-  // 组装内容：增加基础 CSS 确保 iframe 内部内容自适应
   const fullContent = `
         <!DOCTYPE html>
         <html>
@@ -20,23 +17,55 @@ window.runBloggerDemo = function (btn) {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <style>
-                /* 强制修正：确保演示内容不超出容器 */
-                body { margin: 0; padding: 10px; font-family: sans-serif; overflow-x: hidden; }
-                img, div, section { max-width: 100%; box-sizing: border-box; }
+                /* 确保内容从左上角开始缩放 */
+                html, body { 
+                    margin: 0; 
+                    padding: 0; 
+                    font-family: sans-serif; 
+                    overflow-x: hidden; /* 防止横向滚动条 */
+                }
+                body { padding: 10px; box-sizing: border-box; }
+                
+                /* 强制覆盖用户的固定大宽度，确保基础响应式 */
+                * { max-width: 100% !important; box-sizing: border-box !important; }
+                
                 ${css}
             </style>
         </head>
         <body>
-            ${html}
-            <script>${js}<\/script>
+            <div id="demo-content-wrapper">
+                ${html}
+            </div>
+            <script>
+                // 通知父窗口高度
+                function sendHeight() {
+                    const height = document.documentElement.scrollHeight;
+                    window.parent.postMessage({ type: 'resize', height: height }, '*');
+                }
+                window.onload = sendHeight;
+                // 如果有图片加载，重新计算高度
+                window.addEventListener('resize', sendHeight);
+                ${js}
+            <\/script>
         </body>
         </html>
     `;
 
-  // 替代 document.write() 的方案：使用 srcdoc
+  // 1. 设置内容
   iframe.srcdoc = fullContent;
 
-  // 显示预览区域
+  // 2. 监听来自 iframe 的高度调整请求
+  window.addEventListener(
+    'message',
+    function (e) {
+      if (e.data.type === 'resize') {
+        iframe.style.height = e.data.height + 'px';
+      }
+    },
+    false,
+  );
+
+  // 3. UI 切换
   previewArea.style.display = 'block';
   btn.textContent = '刷新预览';
 };
